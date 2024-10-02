@@ -19,7 +19,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 
     // MARK: - Properties
     private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    private var tasks: [TaskModel] = [] // Массив для хранения задач
+    private var tasks: [TaskModel] = []
     private var models = [ToDoListItem]()
 
     // MARK: - Lifecycle Methods
@@ -34,7 +34,6 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     // MARK: - UI Setup
     private func setupUI() {
         addTaskButton.addTarget(self, action: #selector(didTapAdd), for: .touchUpInside)
-        //tableView.register(UITableViewCell(style: .subtitle, reuseIdentifier: "cell"))
         tableView.delegate = self
         tableView.dataSource = self
     }
@@ -49,10 +48,14 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 
     // MARK: - Data Loading
     private func loadInitialData() {
-        if !UserDefaults.standard.bool(forKey: "hasFetchedTasks") {
-            fetchTasksFromNetwork()
-        } else {
-            getAllItems()
+        DispatchQueue.main.async {
+            
+            
+            if !UserDefaults.standard.bool(forKey: "hasFetchedTasks") {
+                self.fetchTasksFromNetwork()
+            } else {
+                self.getAllItems()
+            }
         }
     }
 
@@ -66,8 +69,8 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 self.addTasksToCoreData(fetchedTasks: fetchedTasks)
                 DispatchQueue.main.async {
                     self.tableView.reloadData()
+                    UserDefaults.standard.set(true, forKey: "hasFetchedTasks") // Устанавливаем флаг в UserDefaults
                 }
-                UserDefaults.standard.set(true, forKey: "hasFetchedTasks") // Устанавливаем флаг в UserDefaults
             }
         }
     }
@@ -83,7 +86,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
    private func getAllItems() {
        let fetchRequest: NSFetchRequest<ToDoListItem> = ToDoListItem.fetchRequest()
 
-       // Сортируем по дате создания (предполагаем, что у вас есть поле createAt)
+       // Сортируем по дате создания
        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "createAt", ascending: false)]
 
        do {
@@ -101,12 +104,16 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
        newItem.name = name
        newItem.createAt = Date()
 
+       
+       
        do {
            try context.save() // Сохраняем новую задачу в Core Data
 
-           // Добавляем новый элемент в начало массива models
-           models.insert(newItem, at: 0)
-           tableView.reloadData() // Обновляем таблицу
+           DispatchQueue.main.async {
+               // Добавляем новый элемент в начало массива models
+               self.models.insert(newItem, at: 0)
+               self.tableView.reloadData() // Обновляем таблицу
+           }
        } catch {
            print("Ошибка при сохранении новой задачи: \(error)")
        }
@@ -119,8 +126,11 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
            try context.save() // Сохраняем изменения в Core Data
 
            if let index = models.firstIndex(of:item) {
-               models[index].name=newName
-               tableView.reloadRows(at:[IndexPath(row:index, section : 0)],with:.automatic)
+               
+               DispatchQueue.main.async {
+                   self.models[index].name=newName
+                   self.tableView.reloadRows(at:[IndexPath(row:index, section : 0)],with:.automatic)
+               }
            }
        } catch {
            print("Ошибка при обновлении задачи: \(error)")
@@ -134,15 +144,17 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
           try context.save()
 
           if let index=models.firstIndex(of:item){
-              models.remove(at:index)
-              tableView.deleteRows(at:[IndexPath(row:index , section : 0)],with:.automatic)
+              DispatchQueue.main.async {
+                  self.models.remove(at:index)
+                  self.tableView.deleteRows(at:[IndexPath(row:index , section : 0)],with:.automatic)
+              }
           }
       }catch{
           print("Ошибка при удалении задачи : \(error)")
       }
    }
 
-   // MARK:- Button Actions
+   // MARK: - Button Actions
 
    @objc private func didTapAdd() {
        let alert = UIAlertController(title:"Новая задача", message:"Добавить новую задачу в список", preferredStyle:.alert)
@@ -162,7 +174,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
        present(alert, animated:true)
    }
 
-   // MARK:- Gesture Handling
+   // MARK: - Gesture Handling
 
    private func setupLongPressGesture() {
        let longPressGesture = UILongPressGestureRecognizer(target:self, action:#selector(handleLongPress(_:)))
@@ -252,7 +264,8 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
       }catch{
           print("Ошибка при сохранении состояния выполнения : \(error)")
       }
-
-      tableView.reloadRows(at:[indexPath],with:.automatic )
+       DispatchQueue.main.async {
+           tableView.reloadRows(at:[indexPath],with:.automatic )
+       }
   }
 }
